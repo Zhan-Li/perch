@@ -31,8 +31,17 @@ final class DragMonitor {
 
     // MARK: - Tap
 
+    /// Whether the tap is live. This doubles as the app's notion of "are we
+    /// working", because a live tap is exactly what Accessibility access buys.
+    var isRunning: Bool { tap != nil }
+
+    /// Safe to call repeatedly: returns true immediately if already tapped, and
+    /// otherwise attempts to create the tap, which only succeeds once the user
+    /// has granted Accessibility access.
     @discardableResult
     func start() -> Bool {
+        if tap != nil { return true }
+
         let mask = (1 << CGEventType.leftMouseDown.rawValue)
             | (1 << CGEventType.leftMouseDragged.rawValue)
             | (1 << CGEventType.leftMouseUp.rawValue)

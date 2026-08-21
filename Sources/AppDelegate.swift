@@ -22,41 +22,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Permission
 
-    /// The event tap cannot be created until the user has ticked us in
-    /// System Settings, and macOS gives no notification when they do — so we
-    /// prompt once and then poll quietly until it lands.
+    /// Waits for Accessibility access by repeatedly *trying to do the thing*,
+    /// rather than by asking whether we are allowed to.
+    ///
+    /// `AXIsProcessTrusted` caches its answer for the lifetime of the process.
+    /// An app that was already running when the user ticked the box therefore
+    /// keeps being told it is untrusted forever, and polling that API polls a
+    /// value that can never change — the app looks broken until it is
+    /// relaunched. Creating the event tap is the capability itself, so it
+    /// cannot disagree with reality.
     private func startWhenPermitted() {
-        if AX.isTrusted(prompt: false) {
-            begin()
-            return
-        }
+        if monitor.start() { return }
 
+        // Only ask once; the prompt is what opens System Settings for them.
         _ = AX.isTrusted(prompt: true)
+
         permissionTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
-            guard AX.isTrusted(prompt: false) else { return }
+            guard let self else {
+                timer.invalidate()
+                return
+            }
+            guard self.monitor.start() else { return }
             timer.invalidate()
-            self?.permissionTimer = nil
-            self?.begin()
+            self.permissionTimer = nil
         }
-    }
-
-    private func begin() {
-        guard monitor.start() else {
-            presentTapFailure()
-            return
-        }
-    }
-
-    private func presentTapFailure() {
-        let alert = NSAlert()
-        alert.messageText = "Perch couldn’t watch for window drags"
-        alert.informativeText = """
-            macOS refused the event tap. This usually means Accessibility access \
-            was granted to an older copy of Perch. Remove Perch from \
-            System Settings ▸ Privacy & Security ▸ Accessibility, then add it again.
-            """
-        alert.alertStyle = .warning
-        alert.runModal()
     }
 
     // MARK: - Drag handling
@@ -124,9 +113,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func populate(_ menu: NSMenu) {
         menu.removeAllItems()
-        let trusted = AX.isTrusted(prompt: false)
 
-        if !trusted {
+        // Report what is actually true — whether the tap is live — not what the
+        // cached permission API claims.
+        if !monitor.isRunning {
             let warning = NSMenuItem(
                 title: "Waiting for Accessibility access…",
                 action: #selector(openAccessibilitySettings),
