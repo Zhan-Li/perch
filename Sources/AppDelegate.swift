@@ -8,12 +8,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var permissionTimer: Timer?
     private var editor: LayoutEditorWindowController?
+    private var permissionAttempts = 0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         overlay.reload(ConfigStore.load())
         buildStatusItem()
         wireMonitor()
+        Log.write("launch bundle=\(Bundle.main.bundlePath) pid=\(ProcessInfo.processInfo.processIdentifier)")
+        Log.write("launch axTrusted=\(AX.isTrusted(prompt: false))")
         startWhenPermitted()
+        Log.write("launch tapRunning=\(monitor.isRunning)")
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -42,7 +46,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 timer.invalidate()
                 return
             }
-            guard self.monitor.start() else { return }
+            self.permissionAttempts += 1
+            guard self.monitor.start() else {
+                // Once a second forever would be noise; every fifth attempt is
+                // enough to see whether the state ever changes.
+                if self.permissionAttempts % 5 == 0 {
+                    Log.write("waiting attempt=\(self.permissionAttempts) axTrusted=\(AX.isTrusted(prompt: false)) tapRunning=false")
+                }
+                return
+            }
+            Log.write("tap started after \(self.permissionAttempts) attempt(s)")
             timer.invalidate()
             self.permissionTimer = nil
         }
