@@ -12,6 +12,11 @@ mkdir -p "$BUNDLE/Contents/MacOS" "$BUNDLE/Contents/Resources"
 cp "$ROOT/Resources/Info.plist" "$BUNDLE/Contents/Info.plist"
 printf 'APPL????' > "$BUNDLE/Contents/PkgInfo"
 
+# Regenerate with tools/make-icon.sh if you change the artwork.
+if [ -f "$ROOT/Resources/Perch.icns" ]; then
+	cp "$ROOT/Resources/Perch.icns" "$BUNDLE/Contents/Resources/Perch.icns"
+fi
+
 # Universal binary. Set PERCH_ARCH=native for a fast single-slice dev build;
 # release builds must ship both or Intel Macs cannot launch the app at all.
 compile() {

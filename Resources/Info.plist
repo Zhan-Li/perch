@@ -8,6 +8,8 @@
 	<string>Perch</string>
 	<key>CFBundleExecutable</key>
 	<string>Perch</string>
+	<key>CFBundleIconFile</key>
+	<string>Perch</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.zhanli.perch</string>
 	<key>CFBundleInfoDictionaryVersion</key>

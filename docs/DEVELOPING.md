@@ -89,6 +89,35 @@ If you swap the certificate or bundle ID, clear the stale grant:
 tccutil reset Accessibility com.zhanli.perch
 ```
 
+### Never run two copies at once
+
+The trap this creates in practice: a locally-built Perch and a Perch installed
+from a release DMG share the bundle ID `com.zhanli.perch` but have *different*
+designated requirements — one pins the development certificate, the other pins
+the CI build's code hashes. TCC keys a grant on bundle ID **and** requirement,
+so ticking the box authorises one of them and silently denies the other. The
+symptom is the menu insisting it is "Waiting for Accessibility access…" while
+System Settings shows the toggle on.
+
+Diagnose by comparing them:
+
+```bash
+codesign -d -r- /Applications/Perch.app
+codesign -d -r- build/Perch.app
+```
+
+Recover by quitting every copy, running `tccutil reset Accessibility
+com.zhanli.perch` (it will report once per stale entry — more than one means
+this is your problem), deleting or renaming all but one copy, then granting
+access again.
+
+Also strip the download flag from anything that came off a DMG, or macOS may
+run it from a read-only translocated path where the grant does not stick:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Perch.app
+```
+
 ## Debug logging
 
 ```bash
