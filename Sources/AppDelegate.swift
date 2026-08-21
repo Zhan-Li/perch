@@ -17,7 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.write("launch bundle=\(Bundle.main.bundlePath) pid=\(ProcessInfo.processInfo.processIdentifier)")
         Log.write("launch axTrusted=\(AX.isTrusted(prompt: false))")
         startWhenPermitted()
-        Log.write("launch tapRunning=\(monitor.isRunning)")
+        Log.write("launch tapRunning=\(monitor.isRunning) ready=\(isReady)")
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -26,17 +26,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Permission
 
-    /// Waits for Accessibility access by repeatedly *trying to do the thing*,
-    /// rather than by asking whether we are allowed to.
+    /// Perch needs two distinct things, and conflating them hides failures:
     ///
-    /// `AXIsProcessTrusted` caches its answer for the lifetime of the process.
-    /// An app that was already running when the user ticked the box therefore
-    /// keeps being told it is untrusted forever, and polling that API polls a
-    /// value that can never change — the app looks broken until it is
-    /// relaunched. Creating the event tap is the capability itself, so it
-    /// cannot disagree with reality.
+    ///  - a **CoreGraphics event tap**, to see that a drag is happening. A
+    ///    mouse-only, listen-only tap does *not* require Accessibility, so it
+    ///    starts even when the app has no permission at all.
+    ///  - **Accessibility access**, to read and move the window underneath.
+    ///
+    /// Without the second, the tap fires happily and every AXUIElement call
+    /// fails, so the drag never arms and no icons appear — the app looks dead
+    /// while its event tap is perfectly healthy. Both must be true before we
+    /// call ourselves ready.
+    private var isReady: Bool {
+        AX.isTrusted(prompt: false) && monitor.isRunning
+    }
+
+    @discardableResult
+    private func activate() -> Bool {
+        guard AX.isTrusted(prompt: false) else { return false }
+        return monitor.start()
+    }
+
     private func startWhenPermitted() {
-        if monitor.start() { return }
+        if activate() { return }
 
         // Only ask once; the prompt is what opens System Settings for them.
         _ = AX.isTrusted(prompt: true)
@@ -47,15 +59,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             self.permissionAttempts += 1
-            guard self.monitor.start() else {
+            guard self.activate() else {
                 // Once a second forever would be noise; every fifth attempt is
                 // enough to see whether the state ever changes.
                 if self.permissionAttempts % 5 == 0 {
-                    Log.write("waiting attempt=\(self.permissionAttempts) axTrusted=\(AX.isTrusted(prompt: false)) tapRunning=false")
+                    Log.write("waiting attempt=\(self.permissionAttempts) axTrusted=\(AX.isTrusted(prompt: false)) tapRunning=\(self.monitor.isRunning)")
                 }
                 return
             }
-            Log.write("tap started after \(self.permissionAttempts) attempt(s)")
+            Log.write("ready after \(self.permissionAttempts) attempt(s)")
             timer.invalidate()
             self.permissionTimer = nil
         }
@@ -127,9 +139,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func populate(_ menu: NSMenu) {
         menu.removeAllItems()
 
-        // Report what is actually true — whether the tap is live — not what the
-        // cached permission API claims.
-        if !monitor.isRunning {
+        // Reports the real state: both the tap and Accessibility access.
+        if !isReady {
             let warning = NSMenuItem(
                 title: "Waiting for Accessibility access…",
                 action: #selector(openAccessibilitySettings),
