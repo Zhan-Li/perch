@@ -1,0 +1,90 @@
+name: Release
+
+# Push a tag to publish a release:
+#     git tag v1.0.0 && git push origin v1.0.0
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (e.g. 1.0.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    # Mapped at job level so the conditional below can see them; the `secrets`
+    # context is not available directly in a step `if`.
+    env:
+      MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+      MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+      PERCH_SIGN_IDENTITY: ${{ secrets.PERCH_SIGN_IDENTITY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "value=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Optional: set these three repository secrets to ship a signed and
+      # notarised build. Without them the DMG is still produced, but users must
+      # right-click ▸ Open on first launch and re-grant Accessibility access
+      # after each update, because an ad-hoc signature pins the code hash.
+      - name: Import signing certificate
+        if: env.MACOS_CERT_P12 != ''
+        run: |
+          echo "$MACOS_CERT_P12" | base64 --decode > /tmp/cert.p12
+          security create-keychain -p runner build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p runner build.keychain
+          security import /tmp/cert.p12 -k build.keychain -P "$MACOS_CERT_PASSWORD" -A
+          security set-key-partition-list -S apple-tool:,apple: -s -k runner build.keychain
+          rm -f /tmp/cert.p12
+
+      - name: Build DMG
+        run: ./release.sh "${{ steps.version.outputs.value }}"
+
+      - name: Verify universal binary
+        run: |
+          ARCHS=$(lipo -archs build/Perch.app/Contents/MacOS/Perch)
+          echo "architectures: $ARCHS"
+          case "$ARCHS" in
+            *arm64*) ;;
+            *) echo "::error::missing arm64 slice"; exit 1 ;;
+          esac
+          case "$ARCHS" in
+            *x86_64*) ;;
+            *) echo "::error::missing x86_64 slice"; exit 1 ;;
+          esac
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Perch-dmg
+          path: dist/*.dmg
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.dmg \
+            --title "Perch $GITHUB_REF_NAME" \
+            --notes-file - <<'EOF'
+          ## Install
+
+          1. Download the `.dmg` below and drag **Perch** to Applications.
+          2. **Right-click** Perch ▸ **Open** ▸ **Open**. This is required because
+             Perch is not signed with a paid Apple Developer ID.
+          3. Grant Accessibility access when prompted.
+
+          Requires macOS 13 or later. Universal — Apple Silicon and Intel.
+          EOF

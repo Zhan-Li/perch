@@ -1,0 +1,6 @@
+build/
+*.dmg
+*.zip
+.DS_Store
+dist/
+docs/GO-TO-MARKET.md
