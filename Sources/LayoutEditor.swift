@@ -144,7 +144,7 @@ final class LayoutEditorWindowController: NSWindowController {
         content.addSubview(caption("Icon size", frame: NSRect(x: 300, y: 104, width: 80, height: 14)))
         sizeSlider.frame = NSRect(x: 386, y: 98, width: 314, height: 24)
         sizeSlider.minValue = 56
-        sizeSlider.maxValue = 124
+        sizeSlider.maxValue = 248
         sizeSlider.isContinuous = true
         sizeSlider.target = self
         sizeSlider.action = #selector(appearanceChanged)
