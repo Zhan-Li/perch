@@ -70,57 +70,41 @@ NSGradient(colors: [rgb(30, 18, 110, 0.42), rgb(30, 18, 110, 0)])?
 
 NSGraphicsContext.restoreGraphicsState()
 
-// Rim light along the top edge.
-platePath.lineWidth = 3
-NSColor(white: 1, alpha: 0.34).setStroke()
-platePath.stroke()
+// The split runs edge to edge: the plate *is* the screen, divided. No inner
+// window floating in padding — the seam between the two panes is the only
+// negative space, so the shape stays bold all the way down to 16pt.
+NSGraphicsContext.saveGraphicsState()
+platePath.addClip()
 
-// The tiles. Deliberately uneven — a narrow pane beside a wide one is what a
-// real split looks like, and it is more legible than two equal halves.
-let group = NSRect(x: 268, y: 344, width: 488, height: 336)
-let gap = 34.0
-let leftWidth = 176.0
-let radius = 30.0
+let seam = 20.0
+let splitX = plate.minX + plate.width * 0.40
 
-let left = NSRect(x: group.minX, y: group.minY, width: leftWidth, height: group.height)
-let right = NSRect(
-    x: group.minX + leftWidth + gap,
-    y: group.minY,
-    width: group.width - leftWidth - gap,
-    height: group.height
+// Left pane: solid, the half the window lands in. Clipping to the plate gives
+// it the plate's own rounded corners for free.
+let leftPane = NSRect(
+    x: plate.minX,
+    y: plate.minY,
+    width: splitX - plate.minX - seam / 2,
+    height: plate.height
 )
+NSGradient(starting: NSColor(white: 1, alpha: 0.99), ending: rgb(214, 214, 240, 0.99))?
+    .draw(in: leftPane, angle: -90)
 
-func withShadow(_ body: () -> Void) {
-    NSGraphicsContext.saveGraphicsState()
-    let shadow = NSShadow()
-    shadow.shadowColor = rgb(20, 10, 70, 0.40)
-    shadow.shadowBlurRadius = 34
-    shadow.shadowOffset = NSSize(width: 0, height: -14)
-    shadow.set()
-    body()
-    NSGraphicsContext.restoreGraphicsState()
-}
-
-// Solid pane: the one the window lands in.
-withShadow {
-    NSColor(white: 1, alpha: 0.97).setFill()
-    NSBezierPath(roundedRect: left, xRadius: radius, yRadius: radius).fill()
-}
-
-// Glass pane: the space left over. Its opacity is set by what survives being
-// downscaled to 16pt, not by what looks best at 1024 — too subtle there and the
-// icon degrades into a lone white bar on a purple square.
-withShadow {
-    NSColor(white: 1, alpha: 0.46).setFill()
-    NSBezierPath(roundedRect: right, xRadius: radius, yRadius: radius).fill()
-}
-
-let rightPath = NSBezierPath(roundedRect: right.insetBy(dx: 2, dy: 2), xRadius: radius - 2, yRadius: radius - 2)
-rightPath.lineWidth = 7
-NSColor(white: 1, alpha: 0.85).setStroke()
-rightPath.stroke()
+// A soft shadow falling to the right of the seam, so the solid pane reads as
+// sitting above the empty one rather than being a flat colour boundary.
+let shadowBand = NSRect(x: splitX + seam / 2, y: plate.minY, width: 70, height: plate.height)
+NSGradient(colors: [rgb(24, 12, 92, 0.30), rgb(24, 12, 92, 0)])?
+    .draw(in: shadowBand, angle: 0)
 
 NSGraphicsContext.restoreGraphicsState()
+
+NSGraphicsContext.restoreGraphicsState()
+
+// Rim light, stroked last so it traces the whole plate rather than being
+// painted over by the solid pane.
+platePath.lineWidth = 3
+NSColor(white: 1, alpha: 0.30).setStroke()
+platePath.stroke()
 
 guard let png = rep.representation(using: .png, properties: [:]) else {
     fatalError("could not encode PNG")
