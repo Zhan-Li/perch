@@ -19,6 +19,7 @@ final class LayoutEditorWindowController: NSWindowController {
     private let grid = GridEditorView()
     private let sizeSlider = NSSlider()
     private let marginSlider = NSSlider()
+    private let opacitySlider = NSSlider()
     private let marginCaption = NSTextField(labelWithString: "Distance from edge")
     private let placementPopup = NSPopUpButton()
     private let removeButton = NSButton()
@@ -165,6 +166,15 @@ final class LayoutEditorWindowController: NSWindowController {
         marginSlider.action = #selector(appearanceChanged)
         content.addSubview(marginSlider)
 
+        content.addSubview(caption("Opacity", frame: NSRect(x: 300, y: 64, width: 80, height: 14)))
+        opacitySlider.frame = NSRect(x: 386, y: 58, width: 314, height: 24)
+        opacitySlider.minValue = 0.25
+        opacitySlider.maxValue = 1.0
+        opacitySlider.isContinuous = true
+        opacitySlider.target = self
+        opacitySlider.action = #selector(appearanceChanged)
+        content.addSubview(opacitySlider)
+
         // Footer.
         let reset = button("Reset to Defaults", action: #selector(resetToDefaults), width: 160)
         reset.frame.origin = NSPoint(x: 20, y: 20)
@@ -181,6 +191,7 @@ final class LayoutEditorWindowController: NSWindowController {
 
         sizeSlider.doubleValue = config.iconWidth
         marginSlider.doubleValue = config.topMargin
+        opacitySlider.doubleValue = config.resolvedOpacity
         syncPlacementControls()
     }
 
@@ -328,6 +339,7 @@ final class LayoutEditorWindowController: NSWindowController {
         config.iconWidth = sizeSlider.doubleValue.rounded()
         config.iconHeight = (sizeSlider.doubleValue * 0.68).rounded()
         config.topMargin = marginSlider.doubleValue.rounded()
+        config.opacity = (opacitySlider.doubleValue * 100).rounded() / 100
         commit()
     }
 
@@ -374,6 +386,7 @@ final class LayoutEditorWindowController: NSWindowController {
         config = .fallback
         sizeSlider.doubleValue = config.iconWidth
         marginSlider.doubleValue = config.topMargin
+        opacitySlider.doubleValue = config.resolvedOpacity
         syncPlacementControls()
         commit(reloadAll: true)
         selectRow(0)

@@ -32,6 +32,7 @@ private final class OverlayView: NSView {
     var iconFrames: [NSRect] = []
     var hoverIndex: Int?
     var previewFrame: NSRect?
+    var opacity: CGFloat = 1
 
     override func draw(_ dirtyRect: NSRect) {
         let accent = NSColor.controlAccentColor
@@ -46,7 +47,7 @@ private final class OverlayView: NSView {
         }
 
         for (index, frame) in iconFrames.enumerated() where index < zones.count {
-            ZoneRenderer.draw(zones[index], in: frame, highlighted: index == hoverIndex)
+            ZoneRenderer.draw(zones[index], in: frame, highlighted: index == hoverIndex, opacity: opacity)
         }
     }
 }
@@ -79,6 +80,7 @@ final class OverlayController {
         layoutIcons(on: screen)
 
         view?.zones = config.zones
+        view?.opacity = CGFloat(config.resolvedOpacity)
         view?.hoverIndex = nil
         view?.previewFrame = nil
         view?.needsDisplay = true

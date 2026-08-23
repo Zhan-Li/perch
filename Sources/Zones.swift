@@ -62,6 +62,9 @@ struct Config: Codable {
     var topMargin: Double
     /// Optional so configs written before this setting existed still decode.
     var placement: Placement?
+    /// How solid the icon strip is, 0.25...1. Slightly translucent by default
+    /// so the windows being arranged stay visible underneath it.
+    var opacity: Double?
     /// Extra slack around each icon when deciding whether the cursor is over it.
     /// Aiming at a 76pt target mid-drag wants a little forgiveness.
     var hitPadding: Double
@@ -86,11 +89,16 @@ struct Config: Codable {
         iconGap: 10,
         topMargin: 60,
         placement: .center,
+        opacity: 0.72,
         hitPadding: 8
     )
 
     var resolvedPlacement: Placement {
         placement ?? .center
+    }
+
+    var resolvedOpacity: Double {
+        min(1, max(0.25, opacity ?? 0.72))
     }
 
     /// Drops anything malformed rather than refusing to start. A typo in one
@@ -104,6 +112,7 @@ struct Config: Codable {
         copy.iconGap = max(0, iconGap)
         copy.topMargin = max(0, topMargin)
         copy.placement = resolvedPlacement
+        copy.opacity = resolvedOpacity
         copy.hitPadding = max(0, hitPadding)
         return copy
     }

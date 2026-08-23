@@ -7,7 +7,10 @@ import AppKit
 /// like one thing while you are editing it and another thing mid-drag.
 enum ZoneRenderer {
 
-    static func draw(_ zone: Zone, in frame: NSRect, highlighted: Bool) {
+    /// `opacity` scales every layer at once, so the strip can be made to sit
+    /// lightly over the windows it is arranging without the parts losing their
+    /// relative contrast.
+    static func draw(_ zone: Zone, in frame: NSRect, highlighted: Bool, opacity: CGFloat = 1) {
         let accent = NSColor.controlAccentColor
         let card = NSBezierPath(roundedRect: frame, xRadius: 9, yRadius: 9)
 
@@ -18,14 +21,15 @@ enum ZoneRenderer {
         NSGraphicsContext.saveGraphicsState()
         card.addClip()
 
-        (highlighted ? accent : NSColor(white: 0.11, alpha: 0.94)).setFill()
+        let base = highlighted ? accent : NSColor(white: 0.11, alpha: 1)
+        base.withAlphaComponent(0.94 * opacity).setFill()
         frame.fill()
 
         // Flipped because unitRect measures y from the top. Drawn as a plain
         // rectangle: the clip above gives it the card's corner radius wherever
         // it meets an edge, and leaves it square where it meets another cell.
         let unit = zone.unitRect
-        NSColor(white: 1, alpha: highlighted ? 0.98 : 0.82).setFill()
+        NSColor(white: 1, alpha: (highlighted ? 0.98 : 0.82) * opacity).setFill()
         NSRect(
             x: frame.minX + unit.minX * frame.width,
             y: frame.maxY - (unit.minY + unit.height) * frame.height,
@@ -35,7 +39,7 @@ enum ZoneRenderer {
 
         NSGraphicsContext.restoreGraphicsState()
 
-        NSColor(white: 1, alpha: highlighted ? 0.55 : 0.22).setStroke()
+        NSColor(white: 1, alpha: (highlighted ? 0.55 : 0.22) * opacity).setStroke()
         card.lineWidth = 1
         card.stroke()
     }
