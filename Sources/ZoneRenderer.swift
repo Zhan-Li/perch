@@ -9,31 +9,35 @@ enum ZoneRenderer {
 
     static func draw(_ zone: Zone, in frame: NSRect, highlighted: Bool) {
         let accent = NSColor.controlAccentColor
-
         let card = NSBezierPath(roundedRect: frame, xRadius: 9, yRadius: 9)
+
+        // The card *is* the screen. There is no inset proxy rectangle inside
+        // it, so the filled cells run to the icon's own edge — at these sizes
+        // a border around a border around a fill just wastes the pixels that
+        // carry the meaning.
+        NSGraphicsContext.saveGraphicsState()
+        card.addClip()
+
         (highlighted ? accent : NSColor(white: 0.11, alpha: 0.94)).setFill()
-        card.fill()
+        frame.fill()
+
+        // Flipped because unitRect measures y from the top. Drawn as a plain
+        // rectangle: the clip above gives it the card's corner radius wherever
+        // it meets an edge, and leaves it square where it meets another cell.
+        let unit = zone.unitRect
+        NSColor(white: 1, alpha: highlighted ? 0.98 : 0.82).setFill()
+        NSRect(
+            x: frame.minX + unit.minX * frame.width,
+            y: frame.maxY - (unit.minY + unit.height) * frame.height,
+            width: unit.width * frame.width,
+            height: unit.height * frame.height
+        ).fill()
+
+        NSGraphicsContext.restoreGraphicsState()
+
         NSColor(white: 1, alpha: highlighted ? 0.55 : 0.22).setStroke()
         card.lineWidth = 1
         card.stroke()
-
-        // The screen proxy: a small rectangle standing in for the display.
-        let proxy = frame.insetBy(dx: frame.width * 0.13, dy: frame.height * 0.17)
-        let proxyPath = NSBezierPath(roundedRect: proxy, xRadius: 3, yRadius: 3)
-        NSColor(white: 1, alpha: highlighted ? 0.6 : 0.35).setStroke()
-        proxyPath.lineWidth = 1
-        proxyPath.stroke()
-
-        // The filled cells, flipped because unitRect measures y from the top.
-        let unit = zone.unitRect
-        let fill = NSRect(
-            x: proxy.minX + unit.minX * proxy.width,
-            y: proxy.maxY - (unit.minY + unit.height) * proxy.height,
-            width: unit.width * proxy.width,
-            height: unit.height * proxy.height
-        )
-        NSColor(white: 1, alpha: highlighted ? 0.98 : 0.8).setFill()
-        NSBezierPath(roundedRect: fill.insetBy(dx: 0.5, dy: 0.5), xRadius: 2, yRadius: 2).fill()
     }
 }
 
