@@ -83,9 +83,18 @@ final class OverlayController {
         view?.opacity = CGFloat(config.resolvedOpacity)
         view?.hoverIndex = nil
         view?.previewFrame = nil
-        view?.needsDisplay = true
 
         panel.orderFrontRegardless()
+
+        // Draw synchronously rather than marking the view dirty and letting the
+        // run loop get to it. AppKit skips redrawing a window that is not in the
+        // visible occlusion state, and a panel that has just been ordered back in
+        // is not marked visible until the window server says so — a turn of the
+        // run loop later. A deferred redraw requested in that gap is dropped, and
+        // since ordering the panel out can discard its backing store, what comes
+        // back is an empty window: the icons never appear, while hit testing and
+        // the drop itself keep working because they never touch the view.
+        view?.display()
     }
 
     func hide() {
@@ -118,7 +127,9 @@ final class OverlayController {
 
         view?.hoverIndex = index
         view?.previewFrame = index.flatMap { previewFrame(for: $0) }
-        view?.needsDisplay = true
+        // Synchronous for the same reason as `show`, and cheap because we only
+        // get here when the hovered icon actually changed.
+        view?.display()
         return index
     }
 

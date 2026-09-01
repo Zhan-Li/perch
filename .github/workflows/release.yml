@@ -76,9 +76,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.dmg \
-            --title "Perch $GITHUB_REF_NAME" \
-            --notes-file - <<'EOF'
+          NOTES="$(mktemp)"
+
+          # Lift this version's section out of CHANGELOG.md: everything between
+          # its heading and the next one. A tag with no entry still publishes,
+          # just without a "What changed" block — a missing changelog entry is
+          # not worth failing a release that has already been built.
+          awk -v want="## ${GITHUB_REF_NAME#v}" '
+            $0 == want { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > /tmp/changelog-section
+
+          if [ -s /tmp/changelog-section ]; then
+            echo "## What changed" >> "$NOTES"
+            cat /tmp/changelog-section >> "$NOTES"
+          else
+            echo "::warning::no CHANGELOG.md entry for ${GITHUB_REF_NAME#v}"
+          fi
+
+          cat >> "$NOTES" <<'EOF'
           ## Install
 
           1. Download the `.dmg` below and drag **Perch** to Applications.
@@ -88,3 +105,7 @@ jobs:
 
           Requires macOS 13 or later. Universal — Apple Silicon and Intel.
           EOF
+
+          gh release create "$GITHUB_REF_NAME" dist/*.dmg \
+            --title "Perch $GITHUB_REF_NAME" \
+            --notes-file "$NOTES"
