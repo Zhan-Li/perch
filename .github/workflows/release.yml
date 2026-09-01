@@ -46,8 +46,24 @@ jobs:
           security create-keychain -p runner build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p runner build.keychain
-          security import /tmp/cert.p12 -k build.keychain -P "$MACOS_CERT_PASSWORD" -A
-          security set-key-partition-list -S apple-tool:,apple: -s -k runner build.keychain
+
+          # Stop the keychain relocking part way through a build. The default is
+          # a five minute idle timeout, which a universal build can exceed.
+          security set-keychain-settings -t 3600 -u build.keychain
+
+          # `default-keychain` only decides where new items are created; it does
+          # not put the keychain on the *search* list, and both `codesign` and
+          # build.sh's `find-certificate` probe only search it. Without this the
+          # identity is invisible, build.sh quietly falls back to an ad-hoc
+          # signature, and the release ships with a cdhash-pinned designated
+          # requirement that revokes everyone's Accessibility grant.
+          security list-keychains -d user -s \
+            $(security list-keychains -d user | tr -d ' "') build.keychain
+
+          security import /tmp/cert.p12 -k build.keychain \
+            -P "$MACOS_CERT_PASSWORD" -A -T /usr/bin/codesign
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: -s -k runner build.keychain >/dev/null
           rm -f /tmp/cert.p12
 
       - name: Build DMG
@@ -64,6 +80,29 @@ jobs:
           case "$ARCHS" in
             *x86_64*) ;;
             *) echo "::error::missing x86_64 slice"; exit 1 ;;
+          esac
+
+      # build.sh falls back to an ad-hoc signature when it cannot find the
+      # identity, which is the right call for a local build but disastrous for a
+      # release: an ad-hoc designated requirement pins the cdhash, so every
+      # published build revokes the Accessibility grant of the one before it,
+      # while System Settings still shows the toggle on because that list is
+      # keyed by bundle path. That is invisible in a green build log, so check.
+      - name: Verify signature
+        if: env.MACOS_CERT_P12 != ''
+        run: |
+          codesign --verify --deep --strict build/Perch.app
+
+          if codesign -dv build/Perch.app 2>&1 | grep -q adhoc; then
+            echo "::error::signed ad-hoc despite a signing certificate being configured"
+            exit 1
+          fi
+
+          REQ="$(codesign -d -r- build/Perch.app 2>&1 | grep '^designated')"
+          echo "$REQ"
+          case "$REQ" in
+            *"certificate leaf"*) ;;
+            *) echo "::error::designated requirement does not pin the certificate: $REQ"; exit 1 ;;
           esac
 
       - uses: actions/upload-artifact@v4

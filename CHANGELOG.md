@@ -4,6 +4,35 @@ Each release's section here becomes the body of its GitHub release, so keep
 entries written for someone deciding whether to update — what changed for them,
 not which files moved.
 
+## 1.2.2
+
+- **Updating no longer breaks Accessibility access.** Every release up to and
+  including 1.2.1 was signed ad-hoc, because the release workflow only imports a
+  signing certificate when one is configured and none ever was. An ad-hoc
+  signature's designated requirement pins the code hash, which changes on every
+  build, so each new release invalidated the grant belonging to the one before
+  it. macOS then refused every window operation while System Settings went on
+  showing the toggle switched on, because that list is keyed by bundle path
+  rather than by signature — and switching it off and on again does not rebind
+  the stored grant.
+
+  Releases are now signed with a stable certificate, so the requirement pins the
+  certificate instead of the hash and survives updates.
+
+  **This update needs Accessibility granted one last time**, because it is the
+  release that changes the signature. Quit Perch, then run:
+
+  ```
+  tccutil reset Accessibility com.zhanli.perch
+  ```
+
+  Launch Perch and tick it in System Settings ▸ Privacy & Security ▸
+  Accessibility. Updates after this one will keep the grant.
+
+- The release build now fails outright if it produces an ad-hoc signature while
+  a certificate is configured, instead of shipping a green build that quietly
+  revokes everyone's access.
+
 ## 1.2.1
 
 - Fixed the icon strip silently going missing. After Perch had been running a

@@ -89,6 +89,41 @@ If you swap the certificate or bundle ID, clear the stale grant:
 tccutil reset Accessibility com.zhanli.perch
 ```
 
+### Released builds sign with a separate certificate
+
+The identity above is for local builds only. Releases are built by GitHub
+Actions, which signs with its own long-lived certificate, `Perch Release`, held
+as three repository secrets:
+
+| Secret | Contents |
+|---|---|
+| `MACOS_CERT_P12` | base64 of the PKCS#12 bundle |
+| `MACOS_CERT_PASSWORD` | its export password |
+| `PERCH_SIGN_IDENTITY` | `Perch Release` |
+
+The private key is **not** in the repository. A copy lives in `.signing/`, which
+is gitignored — keep it somewhere you will still have it in a year. Losing it is
+not fatal, but the replacement certificate produces a different requirement, so
+every user has to grant Accessibility one more time.
+
+Generate it with the same `openssl` recipe as above, changing `CN` to
+`Perch Release`, then:
+
+```bash
+base64 -i .signing/perch-release.p12 | tr -d '\n' | gh secret set MACOS_CERT_P12
+gh secret set MACOS_CERT_PASSWORD < .signing/p12-password.txt
+printf 'Perch Release' | gh secret set PERCH_SIGN_IDENTITY
+```
+
+Two things make this easy to get wrong, and both ship a green build that revokes
+every user's Accessibility grant:
+
+- Importing into a keychain is not enough. `security default-keychain` only sets
+  where *new* items go; the keychain must also be added to the **search list**
+  or `codesign` cannot see the identity and `build.sh` falls back to ad-hoc.
+- An ad-hoc fallback is a warning, not an error. The `Verify signature` workflow
+  step exists to turn it into a failed build.
+
 ### Never run two copies at once
 
 The trap this creates in practice: a locally-built Perch and a Perch installed

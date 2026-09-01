@@ -4,3 +4,4 @@ build/
 .DS_Store
 dist/
 docs/GO-TO-MARKET.md
+.signing/
