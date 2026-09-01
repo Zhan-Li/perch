@@ -53,23 +53,65 @@ money if you want more features than this. Perch is the small free one.
 [Releases](https://github.com/zhan-li/perch/releases), open it, and drag
 **Perch** onto the Applications shortcut.
 
-Because Perch is not signed with a paid Apple Developer ID, macOS will refuse
-to open it the first time. Either:
+**First launch.** Perch is signed with a self-signed certificate rather than a
+paid Apple Developer ID, so Gatekeeper refuses the first open. Either:
 
 - **Right-click** the app ▸ **Open** ▸ **Open** in the dialog, or
 - run `xattr -dr com.apple.quarantine /Applications/Perch.app`
 
-> **Heads-up on updates.** Without a Developer ID, each release has a different
-> code signature, so macOS treats it as a different app and asks for
-> Accessibility access again. Remove the old Perch entry in System Settings ▸
-> Privacy & Security ▸ Accessibility and re-add the new one. Annoying, and the
-> only real fix is a $99/year Apple Developer ID — if enough people find this
-> useful, that is what the coffee money goes towards.
+Once per install, not once per launch.
 
-Then grant Accessibility access when prompted — System Settings ▸ Privacy &
-Security ▸ Accessibility. Perch needs it to move and resize other apps'
-windows. That is the only reason. Nothing is collected and nothing leaves your
-machine; there is no network code in this repository.
+**Grant Accessibility** when prompted — System Settings ▸ Privacy & Security ▸
+Accessibility. Perch needs it to move and resize other apps' windows. That is
+the only reason. Nothing is collected and nothing leaves your machine; there is
+no network code in this repository.
+
+### Updating
+
+Drag the new build over the old one. **Your Accessibility grant carries over** —
+there is nothing to re-tick.
+
+Releases are signed with a stable certificate, so the requirement macOS files
+alongside your grant pins that certificate:
+
+```
+designated => identifier "com.zhanli.perch" and certificate leaf = H"358e78f5…"
+```
+
+That value is identical in every release, so the grant keeps matching.
+
+### Coming from 1.2.1 or earlier: one extra step
+
+Releases up to and including 1.2.1 were signed **ad-hoc**, which pins the *code
+hash* instead — and that changes on every build. Each release therefore
+invalidated the grant belonging to the one before it, while System Settings went
+on showing the toggle switched **on**, because that list is keyed by bundle path
+rather than by signature.
+
+Switching the toggle off and on does not fix it. It does not rebind the stored
+requirement, and every release you installed left another dead entry behind.
+
+Clear them once:
+
+```bash
+osascript -e 'quit app "Perch"'
+tccutil reset Accessibility com.zhanli.perch
+open /Applications/Perch.app
+```
+
+Then tick Perch in System Settings ▸ Privacy & Security ▸ Accessibility. This is
+needed **once**, on the upgrade to 1.2.2. Every update after it keeps the grant.
+
+`tools/install-latest.sh` performs this whole sequence — download, replace,
+strip the quarantine flag, clear the stale entries, relaunch:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Zhan-Li/perch/main/tools/install-latest.sh | bash
+```
+
+Note that it clears the entries on *every* run, so it always costs you a
+re-tick. That is what you want when migrating off an ad-hoc build, and
+unnecessary afterwards — for routine updates, just drag the DMG.
 
 ## Build from source
 

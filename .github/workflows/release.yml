@@ -168,9 +168,32 @@ jobs:
           ## Install
 
           1. Download the `.dmg` below and drag **Perch** to Applications.
-          2. **Right-click** Perch ▸ **Open** ▸ **Open**. This is required because
-             Perch is not signed with a paid Apple Developer ID.
-          3. Grant Accessibility access when prompted.
+          2. **Right-click** Perch ▸ **Open** ▸ **Open**. Gatekeeper blocks the
+             first launch because Perch is not signed with a paid Apple
+             Developer ID. Once per install, not once per launch.
+          3. Grant Accessibility access when prompted — System Settings ▸
+             Privacy & Security ▸ Accessibility.
+
+          ## Updating
+
+          Drag the new build over the old one. Your Accessibility grant carries
+          over, because releases are signed with a stable certificate and the
+          requirement stored with the grant pins that certificate.
+
+          **Coming from 1.2.1 or earlier?** Those builds were signed ad-hoc,
+          which pins the code hash instead — so each one invalidated the
+          previous grant and left a dead entry behind, while System Settings
+          kept showing the toggle on. Toggling it does not rebind the stored
+          requirement. Clear them once:
+
+          ```
+          osascript -e 'quit app "Perch"'
+          tccutil reset Accessibility com.zhanli.perch
+          open /Applications/Perch.app
+          ```
+
+          Then re-tick Perch in Accessibility. Needed once; updates after this
+          keep the grant.
 
           Requires macOS 13 or later. Universal — Apple Silicon and Intel.
           EOF

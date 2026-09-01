@@ -3,13 +3,19 @@
 #
 #     curl -fsSL https://raw.githubusercontent.com/Zhan-Li/perch/main/tools/install-latest.sh | bash
 #
-# Perch is signed ad-hoc, so each release has a different code signature and
-# macOS treats it as a different app — the previous Accessibility grant stops
-# applying. This script does the whole dance: download, replace, strip the
-# download flag, clear the stale permission entries, relaunch.
+# Download, replace, strip the download flag, clear stale permission entries,
+# relaunch.
 #
-# You still have to tick the box in System Settings once per update. That is a
-# limitation of shipping without a paid Apple Developer ID, not a bug.
+# This exists for one job: migrating off a release signed **ad-hoc** (1.2.1 and
+# earlier). Those pinned the code hash, which changed on every build, so each
+# release invalidated the previous release's Accessibility grant and left a dead
+# entry behind — while System Settings still showed the toggle on, because that
+# list is keyed by bundle path rather than by signature.
+#
+# Releases from 1.2.2 pin a stable certificate instead, so grants survive
+# updates and a plain drag-the-DMG install is enough. This script still resets
+# the grant on every run, which costs a re-tick you no longer need. Prefer it
+# when coming from 1.2.1 or earlier; prefer the DMG for routine updates.
 set -euo pipefail
 
 REPO="Zhan-Li/perch"
@@ -64,9 +70,10 @@ mv "$STAGED" "$APP"
 # from a read-only translocated path where the permission grant will not stick.
 xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
 
-# Clear permission entries left behind by earlier builds. More than one line of
-# output here means stale entries were conflicting, which is the usual cause of
-# "waiting for Accessibility access" when the toggle already looks enabled.
+# Clear permission entries left behind by earlier builds. One line of output per
+# entry cleared: more than one means ad-hoc releases had stacked up conflicting
+# grants, which is the usual cause of "waiting for Accessibility access" when
+# the toggle already looks enabled.
 tccutil reset Accessibility "$BUNDLE_ID" 2>/dev/null || true
 
 open "$APP"
