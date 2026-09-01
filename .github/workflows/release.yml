@@ -17,22 +17,47 @@ permissions:
 jobs:
   build:
     runs-on: macos-15
-    # Mapped at job level so the conditional below can see them; the `secrets`
-    # context is not available directly in a step `if`.
-    env:
-      MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
-      MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
-      PERCH_SIGN_IDENTITY: ${{ secrets.PERCH_SIGN_IDENTITY }}
     steps:
       - uses: actions/checkout@v4
 
+      # `inputs.version` is caller-supplied text. Expanding it with ${{ }}
+      # substitutes it into the script *before* the shell sees it, so a crafted
+      # version string runs arbitrary commands in the job that holds the signing
+      # key. Pass it through the environment and quote it instead. The character
+      # check then rejects anything that is not a version, which also stops an
+      # embedded newline from forging extra step outputs.
       - name: Resolve version
         id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [ -n "${{ inputs.version }}" ]; then
-            echo "value=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          if [ -n "$INPUT_VERSION" ]; then
+            VALUE="$INPUT_VERSION"
           else
-            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            VALUE="${GITHUB_REF_NAME#v}"
+          fi
+
+          case "$VALUE" in
+            ""|*[!0-9.]*) echo "::error::refusing to build version '$VALUE'"; exit 1 ;;
+          esac
+
+          echo "value=$VALUE" >> "$GITHUB_OUTPUT"
+
+      # The signing secrets are mapped per step rather than at job level, so the
+      # private key is never in the environment of `checkout`, `upload-artifact`
+      # or the version step — a compromised third-party action cannot read what
+      # was never put in its scope. This flag lets the later steps branch on
+      # whether a certificate exists without holding the certificate itself.
+      - name: Detect signing certificate
+        id: signing
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+        run: |
+          if [ -n "$MACOS_CERT_P12" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::no signing certificate configured; build will be ad-hoc"
           fi
 
       # Optional: set these three repository secrets to ship a signed and
@@ -40,7 +65,10 @@ jobs:
       # right-click ▸ Open on first launch and re-grant Accessibility access
       # after each update, because an ad-hoc signature pins the code hash.
       - name: Import signing certificate
-        if: env.MACOS_CERT_P12 != ''
+        if: steps.signing.outputs.available == 'true'
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
         run: |
           echo "$MACOS_CERT_P12" | base64 --decode > /tmp/cert.p12
           security create-keychain -p runner build.keychain
@@ -67,6 +95,8 @@ jobs:
           rm -f /tmp/cert.p12
 
       - name: Build DMG
+        env:
+          PERCH_SIGN_IDENTITY: ${{ secrets.PERCH_SIGN_IDENTITY }}
         run: ./release.sh "${{ steps.version.outputs.value }}"
 
       - name: Verify universal binary
@@ -89,7 +119,7 @@ jobs:
       # while System Settings still shows the toggle on because that list is
       # keyed by bundle path. That is invisible in a green build log, so check.
       - name: Verify signature
-        if: env.MACOS_CERT_P12 != ''
+        if: steps.signing.outputs.available == 'true'
         run: |
           codesign --verify --deep --strict build/Perch.app
 
