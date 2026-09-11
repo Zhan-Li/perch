@@ -5,7 +5,7 @@ import AppKit
 ///
 /// Cell coordinates run left-to-right and top-to-bottom, matching the Quartz
 /// space we place windows in.
-struct Zone: Codable, Equatable {
+struct Zone: Codable, Hashable {
     var name: String
     var cols: Int
     var rows: Int

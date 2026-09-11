@@ -4,6 +4,25 @@ Each release's section here becomes the body of its GitHub release, so keep
 entries written for someone deciding whether to update — what changed for them,
 not which files moved.
 
+## 1.2.3
+
+- **Fixed the icon strip going missing again.** 1.2.1 tried to cure this by
+  drawing the strip synchronously, and it did not hold: after Perch had been
+  running for a few days, dragging a window once more showed nothing, while
+  hovering where the icons used to be and dropping still snapped the window.
+  The strip was still being asked to draw through AppKit's view display cycle,
+  which AppKit gates on the window's occlusion state, and once a long-hidden
+  panel and that gate got out of step nothing the app did could get a repaint
+  through.
+
+  The strip is now built from Core Animation layers instead: each icon is a
+  bitmap Perch renders itself and hands to a layer, and the footprint is a
+  plain bordered layer. Those are committed to the window server
+  unconditionally, so AppKit is never asked to draw anything. The overlay
+  window is also created fresh for every drag and thrown away on drop, so no
+  window can sit hidden for days accumulating stale state between one drag
+  and the next.
+
 ## 1.2.2
 
 - **Updating no longer breaks Accessibility access.** Every release up to and
