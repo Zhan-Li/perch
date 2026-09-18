@@ -7,12 +7,7 @@ window, a strip of layout icons appears. Drop the window on one and it snaps
 there. No hotkeys to memorise, no modifier key to hold, no aiming the cursor
 into a zone first.
 
-<!--
-  TODO: hero recording. Capture with ⇧⌘5, then:
-    ffmpeg -i screen.mov -vf "fps=15,scale=900:-1" -loop 0 docs/demo.gif
-  and restore the line below.
-  ![Perch in action](docs/demo.gif)
--->
+![Perch in action: two windows dragged onto the strip and snapped to the left half, the right half, then centred two-thirds](docs/demo.gif)
 
 ```
    drag a window ──▶  ▮▯  ▯▮  ▤  ▬▭  ◰  ◱  ◲  ◳  ■   ──▶  drop on one
